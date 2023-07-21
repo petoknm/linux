@@ -17,4 +17,7 @@ dtb-$(CONFIG_SOC_LS1021A) += ls1021a-tqmls1021a-mbls1021a-rgb-cdtech-dc44.dtb
 dtb-$(CONFIG_SOC_LS1021A) += ls1021a-tqmls1021a-mbls1021a-rgb-cdtech-fc21.dtb
 dtb-$(CONFIG_ARCH_LS1024A) += \
 	ls1024a-evm.dtb \
+	ls1024a-nas520.dtb \
+	ls1024a-nas540.dtb \
+	ls1024a-nas5xx.dtb \
 	ls1024a-tsx31.dtb
