@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 ifeq ($(CONFIG_ARCH_LS1024A),y)
-EXTRA_CFLAGS += -I$(srctree)/arch/arm/mach-ls1024a/include
+ccflags-y += -I$(srctree)/arch/arm/mach-ls1024a/include
 endif
 
 obj-$(CONFIG_ATA)		+= libata.o
