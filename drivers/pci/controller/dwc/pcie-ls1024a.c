@@ -177,7 +177,7 @@ static int ls1024a_pcie_setup_phy(struct ls1024a_pcie *pcie)
 	return ret;
 }
 
-static int ls1024a_pcie_link_up(struct dw_pcie *pci)
+static bool ls1024a_pcie_link_up(struct dw_pcie *pci)
 {
 	struct ls1024a_pcie *pcie = to_ls1024a_pcie(pci);
 	unsigned int port = pcie->port_idx;
@@ -186,10 +186,10 @@ static int ls1024a_pcie_link_up(struct dw_pcie *pci)
 
 	regmap_read(pcie->app_regs, reg, &val);
 	if ((val & STS0_RDLH_LINK_UP) == STS0_RDLH_LINK_UP)
-		return 1;
+		return true;
 
 	dev_dbg(pci->dev, "No link detected (PCIE%u_STS0: 0x%x).\n", port, val);
-	return 0;
+	return false;
 }
 
 static void ls1024a_pcie_establish_link(struct ls1024a_pcie *pcie)
