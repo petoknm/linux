@@ -489,7 +489,7 @@ static int nas_keys_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int nas_keys_remove(struct platform_device *pdev)
+static void nas_keys_remove(struct platform_device *pdev)
 {
 	int i;
 
@@ -501,8 +501,6 @@ static int nas_keys_remove(struct platform_device *pdev)
 	}
 
 	destroy_workqueue(btn_workqueue);
-
-	return 0;
 }
 
 static const struct of_device_id of_nas_keys_match[] = {
