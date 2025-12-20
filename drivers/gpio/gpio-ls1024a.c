@@ -121,7 +121,7 @@ static int ls1024a_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return (val & mask) ? 1 : 0;
 }
 
-static void ls1024a_gpio_set(struct gpio_chip *chip,
+static int ls1024a_gpio_set(struct gpio_chip *chip,
                              unsigned offset,
                              int value)
 {
@@ -136,7 +136,7 @@ static void ls1024a_gpio_set(struct gpio_chip *chip,
 		reg = GPIO_63_32_PIN_OUTPUT;
 		mask = BIT(offset - 32);
 	}
-	regmap_update_bits(lschip->regmap, reg, mask, value ? mask : 0);
+	return regmap_update_bits(lschip->regmap, reg, mask, value ? mask : 0);
 }
 
 static int ls1024a_gpio_probe(struct platform_device *pdev)
