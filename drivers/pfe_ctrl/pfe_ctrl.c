@@ -620,7 +620,7 @@ int pfe_mod_timer(struct pfe_timer_list *ptimer, unsigned long expires)
 
 int pfe_del_timer(struct pfe_timer_list * ptimer)
 {
-	return del_timer(&ptimer->timer);
+	return timer_delete(&ptimer->timer);
 }
 
 void pfe_add_timer(struct pfe_timer_list * ptimer)
@@ -631,7 +631,7 @@ void pfe_add_timer(struct pfe_timer_list * ptimer)
 
 int pfe_del_timer_sync(struct pfe_timer_list *ptimer)
 {
-	return del_timer_sync(&ptimer->timer);
+	return timer_delete_sync(&ptimer->timer);
 }
 
 int pfe_timer_pending(const struct pfe_timer_list *ptimer)

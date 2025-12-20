@@ -167,12 +167,12 @@ int nas_ctrl_mod_timer(struct nas_ctrl_timer_list *ptimer, unsigned long expires
 
 int nas_ctrl_del_timer(struct nas_ctrl_timer_list * ptimer)
 {
-	return del_timer(&ptimer->timer);
+	return timer_delete(&ptimer->timer);
 }
 
 int nas_ctrl_del_timer_sync(struct nas_ctrl_timer_list *ptimer)
 {
-	return del_timer_sync(&ptimer->timer);
+	return timer_delete_sync(&ptimer->timer);
 }
 
 int nas_ctrl_timer_pending(const struct nas_ctrl_timer_list *ptimer)
