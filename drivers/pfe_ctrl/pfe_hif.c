@@ -892,11 +892,17 @@ int pfe_hif_init(struct pfe *pfe)
 	}
 
 	/* Initilize NAPI for Rx processing */
-	init_dummy_netdev(&hif->dummy_dev);
+	hif->dummy_dev = alloc_netdev_dummy(0);
+	if (!hif->dummy_dev) {
+		printk(KERN_ERR "%s: Could not allocate dummy net device\n", __func__);
+		err = -ENOMEM;
+		goto err2;
+	}
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0))
-	netif_napi_add(&hif->dummy_dev, &hif->napi, pfe_hif_rx_poll, HIF_RX_POLL_WEIGHT);
+	netif_napi_add(hif->dummy_dev, &hif->napi, pfe_hif_rx_poll, HIF_RX_POLL_WEIGHT);
 #else
-	netif_napi_add_weight(&hif->dummy_dev, &hif->napi, pfe_hif_rx_poll, HIF_RX_POLL_WEIGHT);
+	netif_napi_add_weight(hif->dummy_dev, &hif->napi, pfe_hif_rx_poll, HIF_RX_POLL_WEIGHT);
 #endif
 	napi_enable(&hif->napi);
 
@@ -937,6 +943,8 @@ int pfe_hif_init(struct pfe *pfe)
 #endif
 
 	return 0;
+err2:
+	pfe_hif_release_buffers(hif);
 err1:
 	pfe_hif_free_descr(hif);
 err0:
