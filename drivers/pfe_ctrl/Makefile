@@ -43,11 +43,11 @@ all: version config modules
 modules clean:
 	make CROSS_COMPILE="$(CROSS_COMPILE)" V=1 ARCH=$(ARCH) -C $(KERNELDIR) M=`pwd` $@
 
-EXTRA_CFLAGS += -Werror -include $(PWD)/$(src)/$(PFE_DIR)/c2000/version.h -I$(src)/$(PFE_DIR)/c2000 -I$(src)/$(PFE_DIR)/common -I$(src) -DENDIAN_LITTLE -DGCC_TOOLCHAIN -DCOMCERTO_2000 -DCOMCERTO_2000_CONTROL
+ccflags-y += -Werror -include $(PWD)/$(src)/$(PFE_DIR)/c2000/version.h -I$(src)/$(PFE_DIR)/c2000 -I$(src)/$(PFE_DIR)/common -I$(src) -DENDIAN_LITTLE -DGCC_TOOLCHAIN -DCOMCERTO_2000 -DCOMCERTO_2000_CONTROL
 
-EXTRA_CFLAGS += -I$(srctree)/arch/arm/mach-comcerto/include
+ccflags-y += -I$(srctree)/arch/arm/mach-comcerto/include
 
-EXTRA_LDFLAGS += -T$(PWD)/$(src)/control_link.lds
+ldflags-y += -T$(PWD)/$(src)/control_link.lds
 
 obj-m += pfe.o
 
@@ -118,25 +118,25 @@ pfe-$(CONFIG_COMCERTO_MSP) += pfe_mspsync.o
 
 ifeq ($(UNIT_TEST),y)
 pfe-y += pfe_unit_test.o
-EXTRA_CFLAGS+=-DCONFIG_UNIT_TEST
+ccflags-y +=-DCONFIG_UNIT_TEST
 
 ifeq ($(UNIT_TEST_HIF),y)
-EXTRA_CFLAGS+=-DCONFIG_UNIT_TEST_HIF
+ccflags-y +=-DCONFIG_UNIT_TEST_HIF
 endif
 
 endif
 
 ifeq ($(PLATFORM),C2000)
 pfe-y += pfe_platform.o
-EXTRA_CFLAGS+=-DCONFIG_PLATFORM_C2000
+ccflags-y +=-DCONFIG_PLATFORM_C2000
 else ifeq ($(PLATFORM),PCI)
 pfe-y += pfe_pci.o
-EXTRA_CFLAGS+=-DCONFIG_PLATFORM_PCI
-EXTRA_CFLAGS+=-DCONFIG_UTIL_DISABLED
-#EXTRA_CFLAGS+=-DCONFIG_TMU_DUMMY
+ccflags-y +=-DCONFIG_PLATFORM_PCI
+ccflags-y +=-DCONFIG_UTIL_DISABLED
+#ccflags-y +=-DCONFIG_TMU_DUMMY
 else ifeq ($(PLATFORM),EMULATION)
 pfe-y += pfe_emulation.o
-EXTRA_CFLAGS+=-DCONFIG_PLATFORM_EMULATION
+ccflags-y +=-DCONFIG_PLATFORM_EMULATION
 endif
 
 distclean:
