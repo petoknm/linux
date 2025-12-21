@@ -51,7 +51,7 @@ typedef struct pcap_priv_s {
 	struct hif_client_s 	client;
 	u32                     rate_limit;
 	u32                     pkts_per_msec;
-	struct net_device       dummy_dev;
+	struct net_device       *dummy_dev;
 	struct napi_struct      low_napi;
 }pcap_priv_t;
 
