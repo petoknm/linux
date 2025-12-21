@@ -2185,8 +2185,7 @@ static void pfe_vwd_fast_tx_timeout_init(struct vap_desc_s *vap)
 	int i;
 	for (i = 0; i < VWD_TXQ_CNT; i++) {
 		vap->fast_tx_timeout[i].queuenum = i;
-		hrtimer_init(&vap->fast_tx_timeout[i].timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-		vap->fast_tx_timeout[i].timer.function = pfe_vwd_fast_tx_timeout;
+		hrtimer_setup(&vap->fast_tx_timeout[i].timer, pfe_vwd_fast_tx_timeout, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		vap->fast_tx_timeout[i].base = vap->fast_tx_timeout;
 	}
 }
