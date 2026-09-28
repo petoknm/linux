@@ -145,6 +145,9 @@ config PCI_LAYERSCAPE_EP
 	  determines which PCIe controller works in EP mode and which PCIe
 	  controller works in RC mode.
 
+config PCIE_DW_MSI_MASK_ACK
+	bool
+
 config PCIE_LS1024A
 	bool "Freescale LS1024A PCIe controller"
 	depends on OF && (ARCH_LS1024A || COMPILE_TEST)
