@@ -654,6 +654,13 @@ static const struct pci_device_id ahci_pci_tbl[] = {
 	/* Loongson */
 	{ PCI_VDEVICE(LOONGSON, 0x7a08), board_ahci },
 
+	/* ASMedia ASM1061/ASM1062 - avoid MSI hang under NCQ / cache flushes */
+	{ PCI_VDEVICE(ASMEDIA, 0x0611), board_ahci_no_msi },
+	{ PCI_VDEVICE(ASMEDIA, 0x0612), board_ahci_no_msi },
+	{ PCI_VDEVICE(ASMEDIA, 0x1060), board_ahci_no_msi },
+	{ PCI_VDEVICE(ASMEDIA, 0x1061), board_ahci_no_msi },
+	{ PCI_VDEVICE(ASMEDIA, 0x1062), board_ahci_no_msi },
+
 	/* Generic, PCI class code for AHCI */
 	{ PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
 	  PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff, board_ahci },
