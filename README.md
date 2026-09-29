@@ -2,78 +2,79 @@ LS1024A SoC support in Linux 6.x
 ================================
 
 This repository contains a v6.x Linux kernel with additional drivers and
-support for Freescale's LS1024A SoC and the QNAP TS-x31 family of NAS machines.
+support for Freescale's LS1024A SoC, the QNAP TS-x31 family, and the
+Zyxel NAS5xx family (NAS520, NAS540, NAS542) of NAS machines.
 
-My goal is to get a QNAP TS-x31 NAS running with most features on a v5.x Linux
-kernel. When the code is stable enough (i.e. I don't need to break older stuff
-when I write a new driver), I intend to submit patches for integration in
-Linux mainline.
-
-**Be advised that this is a work in progress and that this branch WILL
-be updated using force push.**
-
-Drivers specific to the LS1024A have been re-written from scratch to make use
-of the various frameworks which were introduced since the outdated 3.2.26
-kernel Freescale is providing (common clock framework, device tree, pinctrl and
-PHY frameworks).
+Drivers specific to the LS1024A make use of modern Linux frameworks
+(common clock framework, device tree, pinctrl, PHY, dmaengine, and Crypto API).
 
 
 What's working:
 ---------------
 
-- Dual Cortex A9 SMP
-- UART0
-- UART1
-- Clock controller
-- Pin muxing
-- GPIOs
+- Dual Cortex A9 SMP (including dynamic CPU hotplug)
+- Gigabit Ethernet (PFE using firmware binary blobs)
+- Hardware XOR DMA engine (`comcerto_xor` offload for RAID parity)
+- Hardware Crypto engine (`ls1024a-spacc` offload for AES ECB/CBC ciphers)
+- NAND flash controller with hardware BCH ECC
+- SATA
 - PCIe
 - USB 3.0 in host mode
-- SATA
-- I2C
-- SPI
-- Simple CPU frequency scaling
+- UART0 and UART1
+- Clock controller & reset controller
+- Pin muxing & GPIOs
+- I2C (including external RTC on NAS5xx)
+- SPI & SPI NOR flash
 - Watchdog timer
-- Powering off using PIC on UART0
+- Simple CPU frequency scaling (cpufreq-dt)
+- Powering off using PIC on UART0 (TS-x31) or gpio-poweroff (NAS5xx)
+- Zyxel NAS5xx platform support (MCU, fan PWM, LEDs, front buttons)
 
-What's NOT working yet (but I'll be working on it soon):
---------------------------------------------------------
 
-- Blob-less PFE (Gigabit ethernet)
-- NAND controller + expansion bus
-- DMA controller
-- Timers
-- Crypto engine (SPACC)
+What's NOT working yet:
+-----------------------
+
+- SoC hardware timers (block at 0x90450000; currently system runs on ARM Cortex-A9 TWD local timer)
+- Blob-less PFE (Gigabit ethernet without proprietary firmware blobs)
+
 
 What's NOT working yet and is low on the priority list:
 -------------------------------------------------------
 
 - Suspend to RAM
-- PMU (when I realize the system doesn't wake up :-)  )
-- Other power-saving features (USB, PCIe, SATA, DVFS, Wake on LAN)
+- PMU
+- Other power-saving features (USB, PCIe, SATA link power, Wake on LAN)
 - OTP memory (read-only)
-- TrustZone (maybe, it could be fun)
+- TrustZone
 
-What's NOT working (and I won't try):
--------------------------------------
 
-- RTC (documented, but the QNAP TS-x31 lacks a 32 KHz oscillator)
-- I2S (not routed on my hardware)
+What's NOT working (and won't try / hardware dependent):
+--------------------------------------------------------
+
+- Internal SoC RTC (documented, but QNAP TS-x31 lacks a 32 KHz oscillator; NAS5xx uses external I2C RTC)
+- I2S (not routed on NAS hardware)
 - DPI (no documentation or source code available)
-- IPSEC (no documentation or source code available)
-- DECT (not routed on my hardware)
-- TDM (not routed on my hardware)
-- PFE with firmware binary blobs (too many security concerns: firmware is very
-  complex, ISA (eSi-RISC) is not publicly documented, PEs have access to the
-  DDR and peripherals)
+- DECT (not routed on NAS hardware)
+- TDM (not routed on NAS hardware)
+
 
 Known issues:
 -------------
 
-- CPU1 cannot be brought back up when put offline
+- (None currently known)
+
 
 Changelog:
 ----------
+
+2026-09-29:
+- Rebase on Linux v6.18
+- Added modern Linux Crypto API driver for SPACC hardware crypto engine (`ls1024a-spacc`)
+- Added modern Linux dmaengine driver for hardware XOR DMA engine (`comcerto_xor`)
+- Fixed CPU1 hotplug issue (proper SCU power mode transitions, vector refresh, and MPU reset sequencing)
+- Integrated PFE Gigabit ethernet driver with firmware blobs
+- Added NAND flash controller driver with hardware BCH ECC
+- Added Zyxel NAS5xx platform drivers (MCU, LEDs, keys, PWM fan control)
 
 2022-12-17:
 - Rebase on v6.1
@@ -85,12 +86,10 @@ Changelog:
 - Rebase on v5.16
 
 2021-07-17:
-
 - Rebase on v5.13
 - Fix PCIe controller supplier dependency issue
 
 2021-03-21:
-
 - Added PCIe driver
 - UART0 and SPI support
 - Enabled SPI NOR flash
