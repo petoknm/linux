@@ -56,6 +56,15 @@ config DIGICOLOR_TIMER
 	help
 	  Enables the support for the digicolor timer driver.
 
+config LS1024A_TIMER
+	bool "Freescale LS1024A / Mindspeed Comcerto timer driver" if COMPILE_TEST
+	default y if ARCH_LS1024A
+	select CLKSRC_MMIO
+	select TIMER_OF
+	help
+	  Enables support for the hardware timers on Freescale LS1024A and
+	  Mindspeed Comcerto 2000 SoCs.
+
 config OMAP_DM_TIMER
 	bool "OMAP dual-mode timer driver" if ARCH_K3 || COMPILE_TEST
 	default y if ARCH_K3
