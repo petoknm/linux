@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/crypto/fsl,ls1024a-spacc.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Freescale LS1024A / Mindspeed Comcerto SPACC Crypto Engine
+
+maintainers:
+  - Antigravity Project
+
+properties:
+  compatible:
+    enum:
+      - fsl,ls1024a-spacc
+      - picochip,spacc-ls1024a
+      - picochip,spacc-ipsec
+      - picochip,spacc-l2
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    maxItems: 1
+
+  clock-names:
+    items:
+      - const: spacc
+
+  resets:
+    maxItems: 1
+
+  reset-names:
+    items:
+      - const: spacc
+
+required:
+  - compatible
+  - reg
+  - interrupts
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/clock/ls1024a-clock.h>
+    #include <dt-bindings/reset/ls1024a-reset.h>
+
+    soc {
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        crypto@9b000000 {
+            compatible = "fsl,ls1024a-spacc";
+            reg = <0x9b000000 0x10000>;
+            interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+            clocks = <&clk LS1024A_CLK_IPSEC_SPACC>;
+            clock-names = "spacc";
+            resets = <&rst LS1024A_AXI_IPSEC_SPACC_RST>;
+            reset-names = "spacc";
+        };
+    };
