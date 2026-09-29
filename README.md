@@ -13,6 +13,9 @@ What's working:
 ---------------
 
 - Dual Cortex A9 SMP (including dynamic CPU hotplug)
+- SoC hardware timers (`timer-ls1024a` - 32-bit clocksource & clockevent)
+- PCIe Active State Power Management (ASPM L0s/L1 powersave)
+- SATA Aggressive Link Power Management (ALPM partial/slumber)
 - Gigabit Ethernet (PFE using firmware binary blobs)
 - Hardware XOR DMA engine (`comcerto_xor` offload for RAID parity)
 - Hardware Crypto engine (`ls1024a-spacc` offload for AES ECB/CBC ciphers)
@@ -34,7 +37,6 @@ What's working:
 What's NOT working yet:
 -----------------------
 
-- SoC hardware timers (block at 0x90450000; currently system runs on ARM Cortex-A9 TWD local timer)
 - Blob-less PFE (Gigabit ethernet without proprietary firmware blobs)
 
 
@@ -43,7 +45,7 @@ What's NOT working yet and is low on the priority list:
 
 - Suspend to RAM
 - PMU
-- Other power-saving features (USB, PCIe, SATA link power, Wake on LAN)
+- USB low-power sleep / Wake on LAN
 - OTP memory (read-only)
 - TrustZone
 
@@ -69,6 +71,8 @@ Changelog:
 
 2026-09-29:
 - Rebase on Linux v6.18
+- Added modern Linux clocksource/clockevent driver for SoC hardware timers (`timer-ls1024a`)
+- Enabled PCIe ASPM (L0s/L1 powersave) and SATA ALPM link power management
 - Added modern Linux Crypto API driver for SPACC hardware crypto engine (`ls1024a-spacc`)
 - Added modern Linux dmaengine driver for hardware XOR DMA engine (`comcerto_xor`)
 - Fixed CPU1 hotplug issue (proper SCU power mode transitions, vector refresh, and MPU reset sequencing)

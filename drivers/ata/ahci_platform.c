@@ -63,8 +63,11 @@ static int ahci_probe(struct platform_device *pdev)
 
 		/* Set the SATA PMU clock to 30 MHZ and OOB clock to 125MHZ */
 		dev_info(dev, "Set the SATA PMU clock to 30 MHZ and OOB clock to 125MHZ\n");
-		clk_set_rate(sata_oob_clk,125000000);
-		clk_set_rate(sata_pmu_clk,30000000);
+		clk_set_rate(sata_oob_clk, 125000000);
+		clk_set_rate(sata_pmu_clk, 30000000);
+
+		/* Enable Aggressive Link Power Management (ALPM) support */
+		hpriv->flags |= AHCI_HFLAG_YES_ALPM;
 	}
 #endif
 
