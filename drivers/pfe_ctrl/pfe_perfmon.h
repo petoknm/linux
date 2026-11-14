@@ -25,6 +25,7 @@
 struct pfe_cpumon {
 	u32 cpu_usage_pct[MAX_PE];
 	u32 class_usage_pct;
+	u32 prev_ticks[MAX_PE][2];
 };
 
 struct pfe_memmon {

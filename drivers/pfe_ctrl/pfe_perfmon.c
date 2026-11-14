@@ -34,9 +34,8 @@ static void cpumon_timer_handler(void)
 {
 	int id;
 	u32 dmem_addr;
-	u32 ticks[2];
+	u32 ticks[2], raw[2];
 	u32 total, active;
-	struct pfe_ctrl *ctrl = &pfe->ctrl;
 	struct pfe_cpumon *cpumon = &pfe->cpumon;
 
 	// Process class PE's
@@ -44,20 +43,22 @@ static void cpumon_timer_handler(void)
 	dmem_addr = virt_to_class_dmem(&class_cpu_ticks[0]);
 	for (id = CLASS0_ID; id <= CLASS_MAX_ID; id++)
 	{
-		cpumon->cpu_usage_pct[id] = 0;
-		if (pe_sync_stop(ctrl, (1 << id)) < 0)
-			continue;
-		ticks[0] = be32_to_cpu(pe_dmem_read(id, dmem_addr, 4));
-		ticks[1] = be32_to_cpu(pe_dmem_read(id, dmem_addr + 4, 4));
-		pe_dmem_write(id, 0, dmem_addr, 4);
-		pe_dmem_write(id, 0, dmem_addr + 4, 4);
-		pe_start(ctrl, (1 << id));
+		raw[0] = be32_to_cpu(pe_dmem_read(id, dmem_addr, 4));
+		raw[1] = be32_to_cpu(pe_dmem_read(id, dmem_addr + 4, 4));
+		ticks[0] = raw[0] - cpumon->prev_ticks[id][0];
+		ticks[1] = raw[1] - cpumon->prev_ticks[id][1];
+		cpumon->prev_ticks[id][0] = raw[0];
+		cpumon->prev_ticks[id][1] = raw[1];
+		if (ticks[1] > ticks[0])
+			ticks[1] = ticks[0];
 		ticks[0] >>= 8;	// divide both values by 256, so multiply by 100 won't overflow
 		ticks[1] >>= 8;
 		total += ticks[0];
 		active += ticks[1];
 		if (ticks[0] != 0)
 			cpumon->cpu_usage_pct[id] = compute_active_pct(ticks[0], ticks[1]);
+		else
+			cpumon->cpu_usage_pct[id] = 0;
 	}
 	if (total != 0)
 		cpumon->class_usage_pct = compute_active_pct(total, active);
@@ -69,34 +70,38 @@ static void cpumon_timer_handler(void)
 	dmem_addr = virt_to_tmu_dmem(&tmu_cpu_ticks[0]);
 	for (id = TMU0_ID; id <= TMU_MAX_ID; id++)
 	{
-		cpumon->cpu_usage_pct[id] = 0;
-		if (pe_sync_stop(ctrl, (1 << id)) < 0)
-			continue;
-		ticks[0] = be32_to_cpu(pe_dmem_read(id, dmem_addr, 4));
-		ticks[1] = be32_to_cpu(pe_dmem_read(id, dmem_addr + 4, 4));
-		pe_dmem_write(id, 0, dmem_addr, 4);
-		pe_dmem_write(id, 0, dmem_addr + 4, 4);
-		pe_start(ctrl, (1 << id));
+		raw[0] = be32_to_cpu(pe_dmem_read(id, dmem_addr, 4));
+		raw[1] = be32_to_cpu(pe_dmem_read(id, dmem_addr + 4, 4));
+		ticks[0] = raw[0] - cpumon->prev_ticks[id][0];
+		ticks[1] = raw[1] - cpumon->prev_ticks[id][1];
+		cpumon->prev_ticks[id][0] = raw[0];
+		cpumon->prev_ticks[id][1] = raw[1];
+		if (ticks[1] > ticks[0])
+			ticks[1] = ticks[0];
 		ticks[0] >>= 8;	// divide both values by 256, so multiply by 100 won't overflow
 		ticks[1] >>= 8;
 		if (ticks[0] != 0)
 			cpumon->cpu_usage_pct[id] = compute_active_pct(ticks[0], ticks[1]);
+		else
+			cpumon->cpu_usage_pct[id] = 0;
 	}
 
 	// Process Util PE
 	dmem_addr = virt_to_util_dmem(&util_cpu_ticks[0]);
-	cpumon->cpu_usage_pct[UTIL_ID] = 0;
-	if (pe_sync_stop(ctrl, (1 << UTIL_ID)) < 0)
-		return;
-	ticks[0] = be32_to_cpu(pe_dmem_read(UTIL_ID, dmem_addr, 4));
-	ticks[1] = be32_to_cpu(pe_dmem_read(UTIL_ID, dmem_addr + 4, 4));
-	pe_dmem_write(UTIL_ID, 0, dmem_addr, 4);
-	pe_dmem_write(UTIL_ID, 0, dmem_addr + 4, 4);
-	pe_start(ctrl, (1 << UTIL_ID));
+	raw[0] = be32_to_cpu(pe_dmem_read(UTIL_ID, dmem_addr, 4));
+	raw[1] = be32_to_cpu(pe_dmem_read(UTIL_ID, dmem_addr + 4, 4));
+	ticks[0] = raw[0] - cpumon->prev_ticks[UTIL_ID][0];
+	ticks[1] = raw[1] - cpumon->prev_ticks[UTIL_ID][1];
+	cpumon->prev_ticks[UTIL_ID][0] = raw[0];
+	cpumon->prev_ticks[UTIL_ID][1] = raw[1];
+	if (ticks[1] > ticks[0])
+		ticks[1] = ticks[0];
 	ticks[0] >>= 8;	// divide both values by 256, so multiply by 100 won't overflow
 	ticks[1] >>= 8;
 	if (ticks[0] != 0)
 		cpumon->cpu_usage_pct[UTIL_ID] = compute_active_pct(ticks[0], ticks[1]);
+	else
+		cpumon->cpu_usage_pct[UTIL_ID] = 0;
 }
 
 static int pfe_cpumon_init(struct pfe *pfe)

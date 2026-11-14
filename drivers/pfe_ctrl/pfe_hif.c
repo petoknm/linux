@@ -546,6 +546,17 @@ static int pfe_hif_rx_process(struct pfe_hif *hif, int budget)
 #ifdef HIF_NAPI_STATS
 			hif->napi_counters[NAPI_CLIENT_FULL_COUNT]++;
 #endif
+#if !defined(CONFIG_PLATFORM_PCI)
+			{
+				dma_addr_t dma_addr = dma_map_single(hif->dev, (void *)pkt_hdr,
+								     hif->rx_buf_len[rtc], DMA_FROM_DEVICE);
+
+				if (likely(dma_mapping_error(hif->dev, dma_addr) == 0))
+					desc->data = (u32)dma_addr;
+				else if (printk_ratelimit())
+					printk(KERN_ERR "%s: dma_map_single failed\n", __func__);
+			}
+#endif
 			/* If we want to keep in polling mode to retry later, we need to tell napi that we consumed
 			the full budget or we will hit a livelock scenario. The core code keeps this napi instance
 			at the head of the list and none of the other instances get to run */
@@ -574,13 +585,12 @@ static int pfe_hif_rx_process(struct pfe_hif *hif, int budget)
 		inc_hif_rxidx(rtc);
 
 		if (local_desc.ctrl & BD_CTRL_LIFM) {
-			if (!(hif->client_ctrl & HIF_CTRL_RX_CONTINUED)) {
-				rx_processed++;
+			rx_processed++;
 
 #ifdef HIF_NAPI_STATS
+			if (!(hif->client_ctrl & HIF_CTRL_RX_CONTINUED))
 				hif->napi_counters[NAPI_PACKET_COUNT]++;
 #endif
-			}
 			hif->started = 0;
 		}
 	}
@@ -857,8 +867,8 @@ static int pfe_hif_rx_poll(struct napi_struct *napi, int budget)
 
 	if (work_done < budget)
 	{
-		napi_complete(napi);
-		writel_relaxed(HIF_INT_MASK, HIF_INT_ENABLE);
+		if (napi_complete_done(napi, work_done))
+			writel_relaxed(HIF_INT_MASK, HIF_INT_ENABLE);
 	}
 #ifdef HIF_NAPI_STATS
 	else

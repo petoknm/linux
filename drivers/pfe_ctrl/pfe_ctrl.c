@@ -24,6 +24,7 @@
 #include <linux/list.h>
 #include <linux/kthread.h>
 #include <linux/version.h>
+#include <linux/delay.h>
 #else
 #include "platform.h"
 #endif
@@ -62,6 +63,10 @@ int relax(unsigned long end)
 
 		if (need_resched())
 			schedule();
+		else
+			udelay(1);
+	} else {
+		udelay(1);
 	}
 #else
                 udelay(1);

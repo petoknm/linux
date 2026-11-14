@@ -1667,12 +1667,6 @@ void tmu_init(TMU_CFG *cfg)
 		}
 	}
 
-#ifdef CFG_LRO
-	/* Set TMU-3 queue 5 (LRO) in no-drop mode */
-	writel((3 << 8) | TMU_QUEUE_LRO, TMU_TEQ_CTRL);
-	writel(0, TMU_TEQ_QCFG);
-#endif
-
 	writel(0x05, TMU_TEQ_DISABLE_DROPCHK);
 
 	writel(0x0, TMU_CTRL);

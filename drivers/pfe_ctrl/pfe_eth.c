@@ -2672,7 +2672,7 @@ static struct sk_buff *pfe_eth_rx_skb(struct net_device *dev, struct pfe_eth_pri
 
 			/* Next frags */
 			if (unlikely(!skb)) {
-				printk(KERN_ERR "%s: NULL skb_inflight\n", __func__);
+				net_err_ratelimited("%s: NULL skb_inflight\n", __func__);
 				goto pkt_drop;
 			}
 
@@ -2743,7 +2743,8 @@ pkt_drop:
 }
 
 
-static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_priv_s *priv, unsigned int qno)
+static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_priv_s *priv,
+				       unsigned int qno, int *drop_budget)
 {
 	struct page *p;
 	void *buf_addr;
@@ -2756,6 +2757,7 @@ static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_pr
 	u32 pe_id;
 
 	while (1) {
+		lro_hdr = NULL;
 		buf_addr = hif_lib_receive_pkt(&priv->client, qno, &length, &offset, &rx_ctrl, &desc_ctrl, (void **)&lro_hdr);
 		if (!buf_addr)
 			goto empty;
@@ -2766,6 +2768,16 @@ static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_pr
 			pe_id = 0;
 
 		skb = priv->skb_inflight[qno + pe_id];
+		skb_frag_last = NULL;
+
+		if (unlikely(qno == 2 && (desc_ctrl & CL_DESC_FIRST) && lro_hdr && skb)) {
+			kfree_skb(skb);
+			priv->skb_inflight[qno + pe_id] = NULL;
+			priv->frags_inflight[qno + pe_id] = 0;
+			priv->stats.rx_errors++;
+			skb = NULL;
+			(*drop_budget)--;
+		}
 
 		if (skb && (skb_frag_last = skb_shinfo(skb)->frag_list)) {
 			while (skb_frag_last->next)
@@ -2779,7 +2791,7 @@ static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_pr
 		page_offset = ((unsigned long)buf_addr & ~(PAGE_MASK)) & HIF_RX_PKT_MIN_SIZE_MASK;
 
 		/* First frag */
-		if ((desc_ctrl & CL_DESC_FIRST) && !skb) {
+		if ((desc_ctrl & CL_DESC_FIRST) && !skb && (qno != 2 || lro_hdr)) {
 			p = virt_to_page(buf_addr);
 
 			skb = dev_alloc_skb(MAX_HDR_SIZE + PFE_PKT_HEADROOM + 2);
@@ -2830,7 +2842,7 @@ static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_pr
 
 			/* Next frags */
 			if (unlikely(!skb)) {
-				printk(KERN_ERR "%s: NULL skb_inflight\n", __func__);
+				net_err_ratelimited("%s: NULL skb_inflight\n", __func__);
 				goto pkt_drop;
 			}
 
@@ -2888,6 +2900,22 @@ static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_pr
 
 		/* Keep track of skb for this queue/pe */
 		priv->skb_inflight[qno + pe_id] = skb;
+		if (unlikely(*drop_budget <= 0))
+			return NULL;
+		continue;
+
+pkt_drop:
+		priv->skb_inflight[qno + pe_id] = NULL;
+		priv->frags_inflight[qno + pe_id] = 0;
+
+		if (skb)
+			kfree_skb(skb);
+
+		free_page((unsigned long)buf_addr);
+
+		priv->stats.rx_errors++;
+		if (--(*drop_budget) <= 0)
+			return NULL;
 	}
 
 #ifdef PFE_ETH_FRAG_STATS
@@ -2906,20 +2934,6 @@ static struct sk_buff *pfe_eth_rx_page(struct net_device *dev, struct pfe_eth_pr
 
 	return skb;
 
-pkt_drop:
-	priv->skb_inflight[qno + pe_id] = NULL;
-	priv->frags_inflight[qno + pe_id] = 0;
-
-	if (skb) {
-		kfree_skb(skb);
-	} else {
-		free_page((unsigned long)buf_addr);
-	}
-
-	priv->stats.rx_errors++;
-
-	return NULL;
-
 empty:
 	return NULL;
 }
@@ -2931,21 +2945,34 @@ static int pfe_eth_poll(struct pfe_eth_priv_s *priv, struct napi_struct *napi, u
 	struct net_device *dev = priv->dev;
 	struct sk_buff *skb;
 	int work_done = 0;
+	int drop_budget;
 	unsigned int len;
 
 	netif_info(priv, intr, priv->dev, "%s\n", __func__);
+
+	if (unlikely(budget <= 0))
+		return 0;
+
+	drop_budget = budget;
 
 #ifdef PFE_ETH_NAPI_STATS
 	priv->napi_counters[NAPI_POLL_COUNT]++;
 #endif
 
 	do {
+		if (unlikely(drop_budget <= 0)) {
+			work_done = budget;
+			break;
+		}
 		if (page_mode)
-			skb = pfe_eth_rx_page(dev, priv, qno);
+			skb = pfe_eth_rx_page(dev, priv, qno, &drop_budget);
 		else
 			skb = pfe_eth_rx_skb(dev, priv, qno);
-		if (!skb)
+		if (!skb) {
+			if (drop_budget <= 0)
+				work_done = budget;
 			break;
+		}
 
 
 		len = skb->len;
@@ -2958,7 +2985,11 @@ static int pfe_eth_poll(struct pfe_eth_priv_s *priv, struct napi_struct *napi, u
 		priv->lro_nb_counters[skb_shinfo(skb)->nr_frags & (LRO_NB_COUNT_MAX - 1)]++;
 #endif
 
-		netif_receive_skb(skb);
+		/* Hardware LRO already aggregated the stream; otherwise let GRO do it */
+		if (dev->features & NETIF_F_LRO)
+			netif_receive_skb(skb);
+		else
+			napi_gro_receive(napi, skb);
 
 		priv->stats.rx_packets++;
 		priv->stats.rx_bytes += len;
@@ -2980,9 +3011,8 @@ static int pfe_eth_poll(struct pfe_eth_priv_s *priv, struct napi_struct *napi, u
 	 * net/core/dev.c ( 2.6.33.5 kernel specific).
 	 */
 	if (work_done < budget) {
-		napi_complete(napi);
-
-		hif_lib_event_handler_start(&priv->client, EVENT_RX_PKT_IND, qno);
+		if (napi_complete_done(napi, work_done))
+			hif_lib_event_handler_start(&priv->client, EVENT_RX_PKT_IND, qno);
 	}
 #ifdef PFE_ETH_NAPI_STATS
 	else

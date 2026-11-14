@@ -119,6 +119,7 @@ int pfe_hw_init(struct pfe *pfe, int resume)
 	printk(KERN_INFO "bmu_init(2) done\n");
 
 	class_cfg.resume = resume ? 1 : 0;
+	class_cfg.toe_mode = lro_mode ? 1 : 0;
 
 	class_init(&class_cfg);
 
