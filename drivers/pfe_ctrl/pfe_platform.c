@@ -17,10 +17,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/mii.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/phy.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/reset.h>
@@ -453,6 +458,114 @@ static struct comcerto_pfe_platform_data comcerto_pfe_pdata = {
 	},
 };
 
+#define PFE_RTL8211E_PHY_ID	0x001cc915
+#define PFE_WOL_BMCR_CLEAR	(BMCR_ANENABLE | BMCR_ANRESTART | \
+				 BMCR_SPEED1000 | BMCR_SPEED100 | \
+				 BMCR_FULLDPLX | BMCR_ISOLATE | \
+				 BMCR_PDOWN | BMCR_LOOPBACK)
+
+static bool nas5xx_mcu_wol;
+module_param(nas5xx_mcu_wol, bool, 0644);
+MODULE_PARM_DESC(nas5xx_mcu_wol,
+		 "Prepare NAS5xx RTL8211E PHYs for HT66F30 MCU WoL on poweroff (default: N)");
+
+static bool pfe_nas5xx_wol_requested(const struct pfe *pfe)
+{
+	int i;
+
+	if (nas5xx_mcu_wol)
+		return true;
+
+	for (i = 0; i < NUM_GEMAC_SUPPORT; i++) {
+		const struct pfe_eth_priv_s *priv = pfe->eth.eth_priv[i];
+
+		if (priv && (priv->wol & EMAC_WOL_MAGIC))
+			return true;
+	}
+
+	return false;
+}
+
+static int pfe_nas5xx_prepare_phy_wol(struct phy_device *phydev)
+{
+	int bmcr, ret;
+
+	/*
+	 * Avoid phy_stop() on PHY_READY / PHY_HALTED (which triggers WARN),
+	 * while still halting any active state machine if an interface stayed
+	 * up into poweroff.
+	 */
+	if (phy_is_started(phydev) || phydev->state == PHY_ERROR)
+		phy_stop(phydev);
+
+	mutex_lock(&phydev->lock);
+	/* Keep phylib suspended state aligned before clearing BMCR_PDOWN. */
+	ret = __phy_resume(phydev);
+	if (!ret)
+		ret = phy_modify(phydev, MII_BMCR, PFE_WOL_BMCR_CLEAR, 0);
+	if (!ret) {
+		bmcr = phy_read(phydev, MII_BMCR);
+		if (bmcr < 0)
+			ret = bmcr;
+		else if (bmcr & (PFE_WOL_BMCR_CLEAR | BMCR_RESET))
+			ret = -EIO;
+	}
+	mutex_unlock(&phydev->lock);
+
+	return ret;
+}
+
+/*
+ * On Zyxel NAS5xx boards, Wake-on-LAN is handled after main poweroff by the
+ * standby Holtek HT66F30 MCU once userspace enables EEPROM WoL mode (i2c 0x0a
+ * selector 6 = 0x00). The MCU expects both RTL8211E PHYs to remain powered,
+ * un-isolated, and forced to 10BASE-T half-duplex with autonegotiation off
+ * when gpio-poweroff cuts main SoC power.
+ */
+static void pfe_platform_shutdown(struct platform_device *pdev)
+{
+	struct pfe *pfe = platform_get_drvdata(pdev);
+	bool ok = true;
+	int i;
+
+	if (system_state != SYSTEM_POWER_OFF || !pfe)
+		return;
+
+	if (!of_machine_is_compatible("zyxel,nas5xx"))
+		return;
+
+	if (!pfe_nas5xx_wol_requested(pfe))
+		return;
+
+	for (i = 0; i < NUM_GEMAC_SUPPORT; i++) {
+		struct pfe_eth_priv_s *priv = pfe->eth.eth_priv[i];
+
+		if (!priv || !priv->phydev ||
+		    priv->phydev->phy_id != PFE_RTL8211E_PHY_ID) {
+			dev_warn(&pdev->dev,
+				 "skipping NAS5xx MCU WoL PHY prep: port %d missing or not RTL8211E\n",
+				 i);
+			return;
+		}
+	}
+
+	for (i = 0; i < NUM_GEMAC_SUPPORT; i++) {
+		struct phy_device *phydev = pfe->eth.eth_priv[i]->phydev;
+		int err = pfe_nas5xx_prepare_phy_wol(phydev);
+
+		if (err) {
+			dev_err(&pdev->dev,
+				"failed to prepare PHY %s for NAS5xx MCU WoL: %d\n",
+				phydev_name(phydev), err);
+			ok = false;
+		}
+	}
+
+	if (ok)
+		dev_info(&pdev->dev,
+			 "prepared NAS5xx RTL8211E PHYs for MCU WoL\n");
+}
+
 static const struct of_device_id of_pfe_platform_match[] = {
 	{ .compatible = "fsl,ls1024a-pfe-ctrl", .data = &comcerto_pfe_pdata },
 	{},
@@ -461,6 +574,7 @@ static const struct of_device_id of_pfe_platform_match[] = {
 static struct platform_driver pfe_platform_driver = {
 	.probe = pfe_platform_probe,
 	.remove = pfe_platform_remove,
+	.shutdown = pfe_platform_shutdown,
 	.driver = {
 		.name = "pfe",
 		.of_match_table = of_pfe_platform_match,
